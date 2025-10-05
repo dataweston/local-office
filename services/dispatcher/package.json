@@ -1,0 +1,27 @@
+{
+  "name": "@local-office/dispatcher",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@local-office/lib": "workspace:^",
+    "axios": "1.7.7",
+    "bullmq": "5.29.0",
+    "pino": "9.4.0"
+  },
+  "devDependencies": {
+    "@types/express": "4.17.21",
+    "@types/node": "20.16.10",
+    "nock": "14.0.4",
+    "ts-node": "10.9.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.3"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node --swc src/index.ts",
+    "test": "vitest run"
+  }
+}

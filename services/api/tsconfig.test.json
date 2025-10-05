@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@nestjs/common": ["test/stubs/@nestjs/common"],
+      "@local-office/db": ["test/stubs/@local-office/db"],
+      "@local-office/labeler": ["test/stubs/@local-office/labeler"],
+      "bullmq": ["test/stubs/bullmq"]
+    }
+  }
+}

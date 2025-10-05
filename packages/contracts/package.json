@@ -1,0 +1,21 @@
+{
+  "name": "@local-office/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "spectral lint openapi.yaml",
+    "bundle": "redocly bundle openapi.yaml --output dist/openapi.bundle.yaml",
+    "codegen": "openapi-generator-cli generate -i openapi.yaml -g typescript-fetch -o ./generated",
+    "generate": "node ./scripts/generate.mjs"
+  },
+  "devDependencies": {
+    "@redocly/cli": "1.28.2",
+    "@stoplight/spectral-cli": "6.11.0",
+    "fs-extra": "^11.2.0",
+    "openapi-generator-cli": "1.0.0",
+    "fs-extra": "^11.2.0",
+    "openapi-typescript": "^7.4.3",
+    "yaml": "^2.6.0"
+  }
+}

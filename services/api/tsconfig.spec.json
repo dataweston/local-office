@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@local-office/db": ["./test/stubs/local-office-db.ts"],
+      "@local-office/db/*": ["./test/stubs/local-office-db.ts"],
+      "@local-office/labeler": ["./test/stubs/@local-office/labeler.ts"],
+      "@local-office/labeler/*": ["./test/stubs/@local-office/labeler.ts"],
+      "@local-office/lib": ["../../packages/lib/src"],
+      "@local-office/lib/*": ["../../packages/lib/src/*"],
+      "@local-office/billing": ["../billing/src"],
+      "@local-office/billing/*": ["../billing/src/*"],
+      "@local-office/worker": ["./test/stubs/local-office-worker.ts"],
+      "@local-office/worker/*": ["./test/stubs/local-office-worker.ts"],
+      "@nestjs/common": ["./test/stubs/nestjs-common.ts"],
+      "bullmq": ["./test/stubs/bullmq.ts"]
+      "@local-office/dispatcher": ["./test/stubs/@local-office/dispatcher.ts"],
+      "@local-office/dispatcher/*": ["./test/stubs/@local-office/dispatcher.ts"],
+      "@nestjs/common": ["./test/stubs/nestjs-common.ts"]
+    }
+  }
+}

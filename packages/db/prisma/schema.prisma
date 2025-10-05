@@ -1,0 +1,484 @@
+// Prisma schema for Local Office platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  EMPLOYEE
+  ADMIN
+  PROVIDER
+  SUPERADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  LOCKED
+  BATCHED
+  FULFILLED
+  CANCELED
+}
+
+enum LoyaltyTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum LoyaltyEventType {
+  EARN
+  REDEEM
+}
+
+enum IncidentCategory {
+  MISSING
+  LATE
+  QUALITY
+  OTHER
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PaymentMethod {
+  CARD
+  ACH
+}
+
+enum InvoicePeriod {
+  WEEK
+  MONTH
+}
+
+enum DeliveryStatus {
+  REQUESTED
+  ACCEPTED
+  PICKED_UP
+  DELIVERED
+  CANCELED
+  FAILED
+}
+
+enum BatchStatus {
+  PENDING
+  LOCKED
+  SENT
+  DELIVERED
+  CANCELED
+}
+
+model Org {
+  id              String          @id @default(cuid())
+  name            String
+  slug            String          @unique
+  billingEmail    String?
+  loyaltyTier     LoyaltyTier     @default(BRONZE)
+  billingConfig   OrgBillingConfig?
+  sites           Site[]
+  users           User[]
+  programs        Program[]
+  batches         Batch[]
+  invoices        Invoice[]
+  incidents       Incident[]
+  loyaltyAccounts LoyaltyAccount[]
+  referralsMade   Referral[]      @relation("OrgReferrals")
+  referralsReceived Referral[]    @relation("OrgReferralsReceived")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Site {
+  id        String   @id @default(cuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  name      String
+  address   String
+  timezone  String
+  programs  Program[]
+  batches   Batch[]
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id             String    @id @default(cuid())
+  org            Org?      @relation(fields: [orgId], references: [id])
+  orgId          String?
+  site           Site?     @relation(fields: [siteId], references: [id])
+  siteId         String?
+  provider       Provider? @relation(fields: [providerId], references: [id])
+  providerId     String?
+  email          String    @unique
+  phone          String?
+  firstName      String
+  lastName       String
+  role           UserRole
+  loyaltyAccount LoyaltyAccount?
+  orders         Order[]
+  reportedIncidents Incident[]
+  referrals      Referral[]      @relation("UserReferrals")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Provider {
+  id             String        @id @default(cuid())
+  name           String
+  contactEmail   String?
+  contactPhone   String?
+  menus          Menu[]
+  programSlots   ProgramSlot[]
+  batches        Batch[]
+  users          User[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Program {
+  id               String        @id @default(cuid())
+  org              Org           @relation(fields: [orgId], references: [id])
+  orgId            String
+  site             Site          @relation(fields: [siteId], references: [id])
+  siteId           String
+  name             String
+  cadence          String
+  orderingWindow   String
+  subsidyRules     Json?
+  cutoffHours      Int           @default(48)
+  loyaltyRequired  Boolean       @default(false)
+  programSlots     ProgramSlot[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model ProgramSlot {
+  id            String    @id @default(cuid())
+  program       Program   @relation(fields: [programId], references: [id])
+  programId     String
+  serviceDate   DateTime
+  windowStart   DateTime
+  windowEnd     DateTime
+  cutoffAt      DateTime
+  provider      Provider  @relation(fields: [providerId], references: [id])
+  providerId    String
+  orders        Order[]
+  batches       Batch[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Menu {
+  id           String   @id @default(cuid())
+  provider     Provider @relation(fields: [providerId], references: [id])
+  providerId   String
+  name         String
+  effectiveOn  DateTime
+  expiresOn    DateTime?
+  skus         Sku[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Sku {
+  id             String        @id @default(cuid())
+  menu           Menu          @relation(fields: [menuId], references: [id])
+  menuId         String
+  name           String
+  description    String?
+  price          Decimal       @db.Decimal(10, 2)
+  category       String
+  sourceRegion   String
+  allergens      SkuAllergen[]
+  orderItems     OrderItem[]
+  loyaltyEvents  LoyaltyEvent[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Allergen {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  icon      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  skus      SkuAllergen[]
+}
+
+model SkuAllergen {
+  sku        Sku      @relation(fields: [skuId], references: [id])
+  skuId      String
+  allergen   Allergen @relation(fields: [allergenId], references: [id])
+  allergenId String
+
+  @@id([skuId, allergenId])
+}
+
+model Order {
+  id               String        @id @default(cuid())
+  programSlot      ProgramSlot   @relation(fields: [programSlotId], references: [id])
+  programSlotId    String
+  user             User          @relation(fields: [userId], references: [id])
+  userId           String
+  status           OrderStatus   @default(PENDING)
+  subtotal         Decimal       @db.Decimal(10, 2)
+  tip              Decimal       @db.Decimal(10, 2) @default(0)
+  loyaltyDiscount  Decimal       @db.Decimal(10, 2) @default(0)
+  referralCredit   Decimal       @db.Decimal(10, 2) @default(0)
+  paymentFee       Decimal       @db.Decimal(10, 2) @default(0)
+  total            Decimal       @db.Decimal(10, 2)
+  idempotencyKey   String?       @unique
+  batch            Batch?        @relation(fields: [batchId], references: [id])
+  batchId          String?
+  payment          Payment?
+  items            OrderItem[]
+  incidents        Incident[]
+  deliveryProofs   Proof[]
+  labels           Label[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderId     String
+  sku         Sku      @relation(fields: [skuId], references: [id])
+  skuId       String
+  quantity    Int      @default(1)
+  modifiers   Json?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Batch {
+  id            String        @id @default(cuid())
+  programSlot   ProgramSlot   @relation(fields: [programSlotId], references: [id])
+  programSlotId String
+  site          Site          @relation(fields: [siteId], references: [id])
+  siteId        String
+  provider      Provider      @relation(fields: [providerId], references: [id])
+  providerId    String
+  org           Org           @relation(fields: [orgId], references: [id])
+  orgId         String
+  deliveryFee   Decimal       @db.Decimal(10, 2) @default(20)
+  gratuity      Decimal       @db.Decimal(10, 2) @default(0)
+  status        BatchStatus   @default(PENDING)
+  orders        Order[]
+  labels        Label[]
+  incidents     Incident[]
+  deliveryJob   DeliveryJob?
+  invoices      InvoiceLine[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([siteId, providerId, programSlotId])
+}
+
+model Label {
+  id          String   @id @default(cuid())
+  batch       Batch    @relation(fields: [batchId], references: [id])
+  batchId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderId     String
+  name        String
+  item        String
+  allergens   String[]
+  pdfUrl      String?
+  zplUrl      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Invoice {
+  id             String         @id @default(cuid())
+  org            Org            @relation(fields: [orgId], references: [id])
+  orgId          String
+  period         InvoicePeriod
+  periodStart    DateTime
+  periodEnd      DateTime
+  subtotal       Decimal        @db.Decimal(10, 2)
+  deliveryTotal  Decimal        @db.Decimal(10, 2) @default(0)
+  tipsTotal      Decimal        @db.Decimal(10, 2) @default(0)
+  discountsTotal Decimal        @db.Decimal(10, 2) @default(0)
+  taxesTotal     Decimal        @db.Decimal(10, 2) @default(0)
+  paymentFees    Decimal        @db.Decimal(10, 2) @default(0)
+  total          Decimal        @db.Decimal(10, 2)
+  externalId     String?
+  status         String         @default("draft")
+  externalUrl    String?
+  rawResponse    Json?
+  lines          InvoiceLine[]
+  payments       Payment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model OrgBillingConfig {
+  id               String   @id @default(cuid())
+  org              Org      @relation(fields: [orgId], references: [id])
+  orgId            String   @unique
+  squareCustomerId String
+  squareLocationId String
+  currency         String   @default("USD")
+  netTermsDays     Int      @default(14)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId   String
+  batch       Batch?   @relation(fields: [batchId], references: [id])
+  batchId     String?
+  description String
+  quantity    Int      @default(1)
+  unitAmount  Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  order           Order?        @relation(fields: [orderId], references: [id])
+  orderId         String?       @unique
+  invoice         Invoice?      @relation(fields: [invoiceId], references: [id])
+  invoiceId       String?
+  squarePaymentId String        @unique
+  method          PaymentMethod
+  amount          Decimal       @db.Decimal(10, 2)
+  feeAmount       Decimal       @db.Decimal(10, 2) @default(0)
+  status          String        @default("pending")
+  receivedAt      DateTime?
+  rawResponse     Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Incident {
+  id            String           @id @default(cuid())
+  org           Org?             @relation(fields: [orgId], references: [id])
+  orgId         String?
+  order         Order?           @relation(fields: [orderId], references: [id])
+  orderId       String?
+  batch         Batch?           @relation(fields: [batchId], references: [id])
+  batchId       String?
+  deliveryJob   DeliveryJob?     @relation(fields: [deliveryJobId], references: [id])
+  deliveryJobId String?
+  reporter      User?            @relation(fields: [reporterId], references: [id])
+  reporterId    String?
+  category      IncidentCategory
+  severity      IncidentSeverity @default(MEDIUM)
+  description   String
+  attachments   Json?
+  status        String           @default("open")
+  resolution    Json?
+  loyaltyEvents LoyaltyEvent[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model LoyaltyAccount {
+  id           String          @id @default(cuid())
+  org          Org?            @relation(fields: [orgId], references: [id])
+  orgId        String?
+  user         User?           @relation(fields: [userId], references: [id])
+  userId       String?   @unique
+  balance      Decimal         @db.Decimal(10, 2) @default(0)
+  events       LoyaltyEvent[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model LoyaltyEvent {
+  id              String           @id @default(cuid())
+  account         LoyaltyAccount   @relation(fields: [accountId], references: [id])
+  accountId       String
+  type            LoyaltyEventType
+  amount          Decimal          @db.Decimal(10, 2)
+  occurredAt      DateTime         @default(now())
+  metadata        Json?
+  sku             Sku?             @relation(fields: [skuId], references: [id])
+  skuId           String?
+  incident        Incident?        @relation(fields: [incidentId], references: [id])
+  incidentId      String?
+  referral        Referral?        @relation(fields: [referralId], references: [id])
+  referralId      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Referral {
+  id              String          @id @default(cuid())
+  code            String          @unique
+  referrerOrg     Org?            @relation("OrgReferrals", fields: [referrerOrgId], references: [id])
+  referrerOrgId   String?
+  referrerAdmin   User?           @relation("UserReferrals", fields: [referrerAdminId], references: [id])
+  referrerAdminId String?
+  referredOrg     Org?            @relation("OrgReferralsReceived", fields: [referredOrgId], references: [id])
+  referredOrgId   String?
+  creditIssued    Boolean         @default(false)
+  metadata        Json?
+  loyaltyEvents   LoyaltyEvent[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model DeliveryJob {
+  id             String        @id @default(cuid())
+  batch          Batch         @relation(fields: [batchId], references: [id])
+  batchId        String        @unique
+  adapter        String
+  externalJobId  String?       @unique
+  trackingUrl    String?
+  status         DeliveryStatus @default(REQUESTED)
+  requestedAt    DateTime       @default(now())
+  acceptedAt     DateTime?
+  pickedUpAt     DateTime?
+  deliveredAt    DateTime?
+  canceledAt     DateTime?
+  failedAt       DateTime?
+  metadata       Json?
+  proofs         Proof[]
+  incidents      Incident[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Proof {
+  id           String    @id @default(cuid())
+  deliveryJob  DeliveryJob @relation(fields: [deliveryJobId], references: [id])
+  deliveryJobId String
+  order        Order?    @relation(fields: [orderId], references: [id])
+  orderId      String?
+  type         String
+  url          String
+  capturedAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model WebhookEvent {
+  id           String   @id @default(cuid())
+  type         String
+  payload      Json
+  attempts     Int      @default(0)
+  deliveredAt  DateTime?
+  nextAttempt  DateTime?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+

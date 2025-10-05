@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2020",
+    "sourceMap": true,
+    "outDir": "dist",
+    "baseUrl": "./",
+    "paths": {
+      "@local-office/db": ["../../packages/db/src"],
+      "@local-office/db/*": ["../../packages/db/src/*"],
+      "@local-office/lib": ["../../packages/lib/src"],
+      "@local-office/lib/*": ["../../packages/lib/src/*"],
+      "@local-office/billing": ["../billing/src"],
+      "@local-office/billing/*": ["../billing/src/*"],
+      "@local-office/worker": ["../worker/src"],
+      "@local-office/worker/*": ["../worker/src/*"],
+      "@local-office/dispatcher": ["../dispatcher/src"],
+      "@local-office/dispatcher/*": ["../dispatcher/src/*"]
+    },
+    "incremental": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": false,
+    "skipLibCheck": true,
+    "moduleResolution": "Node",
+    "types": ["node"],
+    "esModuleInterop": true
+  },
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,58 @@
+{
+  "version": "0.1.0",
+  "functions": [
+    {
+      "name": "createProgram",
+      "description": "Create or update a meal program",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "string" },
+          "siteId": { "type": "string" },
+          "name": { "type": "string" },
+          "cadence": { "type": "string" },
+          "orderingWindow": { "type": "string" },
+          "cutoffHours": { "type": "integer", "default": 48 }
+        },
+        "required": ["orgId", "siteId", "name", "cadence", "orderingWindow"]
+      }
+    },
+    {
+      "name": "createOrder",
+      "description": "Place an order before the 48-hour cutoff",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "programSlotId": { "type": "string" },
+          "userId": { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "skuId": { "type": "string" },
+                "quantity": { "type": "integer", "minimum": 1 }
+              },
+              "required": ["skuId", "quantity"]
+            }
+          }
+        },
+        "required": ["programSlotId", "userId", "items"]
+      }
+    },
+    {
+      "name": "listInvoices",
+      "description": "List invoices for an organization",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "org": { "type": "string" },
+          "period": { "type": "string", "enum": ["WEEK", "MONTH"] },
+          "cursor": { "type": "string" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+        },
+        "required": ["org"]
+      }
+    }
+  ]
+}

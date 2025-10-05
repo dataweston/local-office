@@ -1,0 +1,29 @@
+{
+  "name": "@local-office/worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node --swc src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@local-office/billing": "workspace:^",
+    "@local-office/db": "workspace:^",
+    "@local-office/lib": "workspace:^",
+    "@local-office/labeler": "workspace:^",
+    "aws-sdk": "^2.1692.0",
+    "bullmq": "5.29.0",
+    "ioredis": "5.4.1",
+    "pino": "9.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.10",
+    "redis-memory-server": "0.13.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.4"
+  }
+}

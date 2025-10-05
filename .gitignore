@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.next/
+coverage/
+.vscode/
+.env*
+*.log
+*.tsbuildinfo
+apps/web/.playwright/
+apps/web/test-results/

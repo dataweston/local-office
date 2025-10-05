@@ -1,0 +1,1125 @@
+openapi: 3.1.0
+info:
+  title: Local Office API
+  version: 0.1.0
+  summary: REST API for corporate lunch orchestration.
+  description: |
+    JSON-first API for managing lunch programs, orders, batching, delivery orchestration,
+    invoicing, incidents, loyalty, and referrals. All mutating endpoints accept an
+    Idempotency-Key header for safe retries and emit webhooks for state changes.
+servers:
+  - url: https://api.localoffice.example.com
+    description: Production
+  - url: https://staging-api.localoffice.example.com
+    description: Staging
+security:
+  - bearerAuth: []
+tags:
+  - name: Programs
+  - name: Orders
+  - name: Batches
+  - name: Incidents
+  - name: Referrals
+  - name: Billing
+  - name: Webhooks
+paths:
+  /v1/programs:
+    get:
+      tags: [Programs]
+      summary: List meal programs for an organization or site
+      operationId: listPrograms
+      parameters:
+        - name: org
+          in: query
+          schema:
+            type: string
+        - name: site
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Program list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramListResponse'
+    post:
+      tags: [Programs]
+      summary: Create or update a meal program
+      description: >-
+        Creates or updates a meal program with cadence, order windows, subsidy rules,
+        and cutoff settings. The operation is idempotent using the optional program id in the payload.
+      operationId: createProgram
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgramUpsertRequest'
+      responses:
+        '201':
+          description: Program created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramResponse'
+        '200':
+          description: Program updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/orders:
+    get:
+      tags: [Orders]
+      summary: List orders matching filters
+      operationId: listOrders
+      parameters:
+        - name: org
+          in: query
+          schema:
+            type: string
+        - name: programSlotId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Order list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+    post:
+      tags: [Orders]
+      summary: Create an order
+      description: |
+        Creates a new order for an employee. Validates the 48-hour cutoff and enforces
+        the maximum group size of 50 per batch. When subsidy applies, the total reflects
+        discounts and loyalty credits.
+      operationId: createOrder
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Order violates cutoff or group size
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/orders/{id}/confirm:
+    post:
+      tags: [Orders]
+      summary: Confirm an order and create payment intent
+      operationId: confirmOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Order confirmed and payment initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderConfirmationResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/batches/{id}/manifest:
+    get:
+      tags: [Batches]
+      summary: Retrieve batch prep manifest
+      operationId: getBatchManifest
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch manifest payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchManifest'
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/batches/{id}/labels:
+    get:
+      tags: [Batches]
+      summary: Retrieve label status for a batch
+      operationId: getBatchLabels
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current label status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchLabelsResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Batches]
+      summary: Generate labels for a batch
+      operationId: generateBatchLabels
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Label job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelJobAcceptedResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/batches:
+    get:
+      tags: [Batches]
+      summary: List batches for providers or admins
+      operationId: listBatches
+      parameters:
+        - name: org
+          in: query
+          schema:
+            type: string
+        - name: providerId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/BatchStatus'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Batch list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchListResponse'
+  /v1/incidents:
+    get:
+      tags: [Incidents]
+      summary: List reported incidents
+      operationId: listIncidents
+      parameters:
+        - name: org
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, acknowledged, resolved]
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/IncidentSeverity'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Incident list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentListResponse'
+    post:
+      tags: [Incidents]
+      summary: Report an incident
+      operationId: createIncident
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentRequest'
+      responses:
+        '201':
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /v1/referrals:
+    post:
+      tags: [Referrals]
+      summary: Create or redeem a referral code
+      operationId: createReferral
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralRequest'
+      responses:
+        '201':
+          description: Referral created or applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferralResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /v1/invoices:
+    get:
+      tags: [Billing]
+      summary: List invoices for an organization
+      operationId: listInvoices
+      parameters:
+        - name: org
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            $ref: '#/components/schemas/InvoicePeriod'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Paginated invoice list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/webhooks/{vendor}:
+    post:
+      tags: [Webhooks]
+      summary: Inbound webhook receiver
+      description: Accepts webhooks from Olo, Dispatch, and Uber Direct after signature verification.
+      operationId: receiveVendorWebhook
+      parameters:
+        - name: vendor
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [olo, dispatch, uber]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Webhook accepted for processing
+        '400': { $ref: '#/components/responses/BadRequest' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Unique key to ensure idempotent processing of write operations.
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication credentials missing or invalid.
+    Forbidden:
+      description: User does not have permission for the requested resource.
+    NotFound:
+      description: Resource not found.
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    ProgramUpsertRequest:
+      type: object
+      required: [orgId, siteId, name, cadence, orderingWindow, cutoffHours]
+      properties:
+        id:
+          type: string
+        orgId:
+          type: string
+        siteId:
+          type: string
+        name:
+          type: string
+        cadence:
+          type: string
+          description: Human-readable cadence descriptor.
+        orderingWindow:
+          type: string
+        subsidyRules:
+          type: object
+          additionalProperties: true
+        cutoffHours:
+          type: integer
+          default: 48
+        loyaltyRequired:
+          type: boolean
+          default: false
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgramSlotInput'
+    ProgramSlotInput:
+      type: object
+      required: [serviceDate, windowStart, windowEnd, providerId, cutoffAt]
+      properties:
+        id:
+          type: string
+        serviceDate:
+          type: string
+          format: date-time
+        windowStart:
+          type: string
+          format: date-time
+        windowEnd:
+          type: string
+          format: date-time
+        cutoffAt:
+          type: string
+          format: date-time
+        providerId:
+          type: string
+    ProgramResponse:
+      allOf:
+        - $ref: '#/components/schemas/Program'
+    ProgramListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Program'
+        nextCursor:
+          type: string
+          nullable: true
+    Program:
+      type: object
+      required: [id, orgId, siteId, name, cadence, orderingWindow, cutoffHours, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        orgId:
+          type: string
+        siteId:
+          type: string
+        name:
+          type: string
+        cadence:
+          type: string
+        orderingWindow:
+          type: string
+        subsidyRules:
+          type: object
+          additionalProperties: true
+        cutoffHours:
+          type: integer
+        loyaltyRequired:
+          type: boolean
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgramSlot'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProgramSlot:
+      type: object
+      required: [id, programId, providerId, serviceDate, windowStart, windowEnd, cutoffAt]
+      properties:
+        id:
+          type: string
+        programId:
+          type: string
+        providerId:
+          type: string
+        serviceDate:
+          type: string
+          format: date-time
+        windowStart:
+          type: string
+          format: date-time
+        windowEnd:
+          type: string
+          format: date-time
+        cutoffAt:
+          type: string
+          format: date-time
+    CreateOrderRequest:
+      type: object
+      required: [programSlotId, userId, items]
+      properties:
+        programSlotId:
+          type: string
+        userId:
+          type: string
+        notes:
+          type: string
+        tip:
+          type: number
+          format: float
+          minimum: 0
+        gratuityPercentage:
+          type: number
+          format: float
+          minimum: 0
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/OrderItemInput'
+    OrderItemInput:
+      type: object
+      required: [skuId, quantity]
+      properties:
+        skuId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        modifiers:
+          type: object
+          additionalProperties: true
+        notes:
+          type: string
+    OrderResponse:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+    OrderListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        nextCursor:
+          type: string
+          nullable: true
+    OrderConfirmationResponse:
+      type: object
+      required: [order, payment]
+      properties:
+        order:
+          $ref: '#/components/schemas/Order'
+        payment:
+          $ref: '#/components/schemas/PaymentIntent'
+    Order:
+      type: object
+      required:
+        - id
+        - programSlotId
+        - userId
+        - status
+        - subtotal
+        - total
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        programSlotId:
+          type: string
+        userId:
+          type: string
+        batchId:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        subtotal:
+          type: number
+          format: float
+        tip:
+          type: number
+          format: float
+        loyaltyDiscount:
+          type: number
+          format: float
+        referralCredit:
+          type: number
+          format: float
+        paymentFee:
+          type: number
+          format: float
+        total:
+          type: number
+          format: float
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrderItem:
+      type: object
+      required: [id, orderId, skuId, quantity]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        skuId:
+          type: string
+        quantity:
+          type: integer
+        modifiers:
+          type: object
+          additionalProperties: true
+        notes:
+          type: string
+    OrderStatus:
+      type: string
+      enum: [PENDING, LOCKED, BATCHED, FULFILLED, CANCELED]
+    PaymentIntent:
+      type: object
+      required: [provider, clientSecret, methodOptions]
+      properties:
+        provider:
+          type: string
+          enum: [square]
+        clientSecret:
+          type: string
+        methodOptions:
+          type: object
+          additionalProperties: true
+    BatchManifest:
+      type: object
+      required: [batch, items]
+      properties:
+        batch:
+          $ref: '#/components/schemas/Batch'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManifestLine'
+    ManifestLine:
+      type: object
+      required: [orderId, skuId, name, quantity]
+      properties:
+        orderId:
+          type: string
+        skuId:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: integer
+        allergens:
+          type: array
+          items:
+            type: string
+    Batch:
+      type: object
+      required: [id, programSlotId, siteId, providerId, orgId, status, deliveryFee]
+      properties:
+        id:
+          type: string
+        programSlotId:
+          type: string
+        siteId:
+          type: string
+        providerId:
+          type: string
+        orgId:
+          type: string
+        status:
+          $ref: '#/components/schemas/BatchStatus'
+        deliveryFee:
+          type: number
+          format: float
+        gratuity:
+          type: number
+          format: float
+        manifestUrl:
+          type: string
+          format: uri
+          nullable: true
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BatchStatus:
+      type: string
+      enum: [PENDING, LOCKED, SENT, DELIVERED, CANCELED]
+    BatchListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+        nextCursor:
+          type: string
+          nullable: true
+    LabelGenerationResponse:
+    LabelJobAcceptedResponse:
+      type: object
+      required: [batchId, status]
+      properties:
+        batchId:
+          type: string
+        status:
+          type: string
+          enum: [queued]
+    BatchLabelsResponse:
+      type: object
+      required: [batchId, status, pdfUrl, zplUrl, labels]
+      properties:
+        batchId:
+          type: string
+        status:
+          type: string
+          enum: [pending, ready]
+        pdfUrl:
+          type: string
+          format: uri
+          nullable: true
+        zplUrl:
+          type: string
+          format: uri
+          nullable: true
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+    Label:
+      type: object
+      required: [id, orderId, name, item]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        name:
+          type: string
+        item:
+          type: string
+        allergens:
+          type: array
+          items:
+            type: string
+        pdfUrl:
+          type: string
+          format: uri
+          nullable: true
+        zplUrl:
+          type: string
+          format: uri
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    IncidentRequest:
+      type: object
+      required: [category, severity, description]
+      properties:
+        orderId:
+          type: string
+        batchId:
+          type: string
+        deliveryJobId:
+          type: string
+        category:
+          $ref: '#/components/schemas/IncidentCategory'
+        severity:
+          $ref: '#/components/schemas/IncidentSeverity'
+        description:
+          type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+    IncidentResponse:
+      allOf:
+        - $ref: '#/components/schemas/Incident'
+    IncidentListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Incident'
+        nextCursor:
+          type: string
+          nullable: true
+    Incident:
+      type: object
+      required: [id, category, severity, description, status, createdAt]
+      properties:
+        id:
+          type: string
+        orgId:
+          type: string
+          nullable: true
+        orderId:
+          type: string
+          nullable: true
+        batchId:
+          type: string
+          nullable: true
+        deliveryJobId:
+          type: string
+          nullable: true
+        category:
+          $ref: '#/components/schemas/IncidentCategory'
+        severity:
+          $ref: '#/components/schemas/IncidentSeverity'
+        description:
+          type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+        status:
+          type: string
+          enum: [open, acknowledged, resolved]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    IncidentCategory:
+      type: string
+      enum: [MISSING, LATE, QUALITY, OTHER]
+    IncidentSeverity:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    Attachment:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+        description:
+          type: string
+    ReferralRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [create, apply]
+        code:
+          type: string
+        orgId:
+          type: string
+        adminId:
+          type: string
+    ReferralResponse:
+      type: object
+      required: [referral]
+      properties:
+        referral:
+          $ref: '#/components/schemas/Referral'
+    Referral:
+      type: object
+      required: [id, code]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        referrerOrgId:
+          type: string
+          nullable: true
+        referrerAdminId:
+          type: string
+          nullable: true
+        referredOrgId:
+          type: string
+          nullable: true
+        creditIssued:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    InvoiceListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        nextCursor:
+          type: string
+          nullable: true
+    Invoice:
+      type: object
+      required: [id, orgId, period, periodStart, periodEnd, subtotal, total]
+      properties:
+        id:
+          type: string
+        orgId:
+          type: string
+        period:
+          $ref: '#/components/schemas/InvoicePeriod'
+        periodStart:
+          type: string
+          format: date-time
+        periodEnd:
+          type: string
+          format: date-time
+        subtotal:
+          type: number
+          format: float
+        deliveryTotal:
+          type: number
+          format: float
+        tipsTotal:
+          type: number
+          format: float
+        discountsTotal:
+          type: number
+          format: float
+        taxesTotal:
+          type: number
+          format: float
+        paymentFees:
+          type: number
+          format: float
+        total:
+          type: number
+          format: float
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    InvoicePeriod:
+      type: string
+      enum: [WEEK, MONTH]
+    AttachmentList:
+      type: array
+      items:
+        $ref: '#/components/schemas/Attachment'
+    DeliveryStatus:
+      type: string
+      enum: [scheduled, en_route, delivered, canceled]
+webhooks:
+  event.batch.locked:
+    post:
+      summary: Batch locked notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, manifestUrl, orders]
+              properties:
+                id:
+                  type: string
+                manifestUrl:
+                  type: string
+                  format: uri
+                orders:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Order'
+  event.delivery.updated:
+    post:
+      summary: Delivery status update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deliveryJobId, status]
+              properties:
+                deliveryJobId:
+                  type: string
+                status:
+                  $ref: '#/components/schemas/DeliveryStatus'
+                proof:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Attachment'
+  event.invoice.created:
+    post:
+      summary: Invoice created notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoice]
+              properties:
+                invoice:
+                  $ref: '#/components/schemas/Invoice'
+  event.incident.opened:
+    post:
+      summary: Incident opened notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incident]
+              properties:
+                incident:
+                  $ref: '#/components/schemas/Incident'
+  event.incident.resolved:
+    post:
+      summary: Incident resolved notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incident]
+              properties:
+                incident:
+                  $ref: '#/components/schemas/Incident'
