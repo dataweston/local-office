@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
@@ -388,7 +388,7 @@ export default function AdminPage() {
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-500">We generate manifests and invoices automatically once orders lock.</p>
                 <Button type="submit" disabled={saving || !isAuthenticated}>
-                  {saving ? 'Saving…' : 'Save program'}
+                  {saving ? 'Saving...' : 'Save program'}
                 </Button>
               </div>
             </form>
@@ -402,7 +402,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-sm text-slate-500">Loading programs…</p>
+              <p className="text-sm text-slate-500">Loading programs...</p>
             ) : decoratedPrograms.length === 0 ? (
               <p className="text-sm text-slate-500">No programs yet. Use the form to create one.</p>
             ) : (
@@ -418,7 +418,7 @@ export default function AdminPage() {
                     </div>
                     {program.nextSlot ? (
                       <p className="mt-2 text-xs text-slate-600">
-                        Next slot {format(parseISO(program.nextSlot.serviceDate), 'MMM d h:mma')} · cutoff{' '}
+                        Next slot {format(parseISO(program.nextSlot.serviceDate), 'MMM d h:mma')} - cutoff{' '}
                         {formatDistanceToNowStrict(parseISO(program.nextSlot.cutoffAt), { addSuffix: true })}
                       </p>
                     ) : (
@@ -428,8 +428,7 @@ export default function AdminPage() {
                       <p className="mt-2 text-xs text-slate-600">Subsidy: {JSON.stringify(program.subsidyRules)}</p>
                     ) : null}
                   </li>
-                );
-                })}
+                ))}
               </ul>
             )}
           </CardContent>
@@ -452,14 +451,14 @@ export default function AdminPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-slate-800">{order.items?.[0]?.skuId ?? 'Custom order'}</p>
-                        <p className="text-xs text-slate-500">{order.items?.[0]?.quantity ?? 1} items · {order.total.toFixed(2)}</p>
+                        <p className="text-xs text-slate-500">{order.items?.[0]?.quantity ?? 1} items - {order.total.toFixed(2)}</p>
                       </div>
                       <Button
                         size="sm"
                         onClick={() => confirmOrder(order.id)}
                         disabled={approving === order.id}
                       >
-                        {approving === order.id ? 'Confirming…' : 'Confirm order'}
+                        {approving === order.id ? 'Confirming...' : 'Confirm order'}
                       </Button>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
@@ -496,7 +495,7 @@ export default function AdminPage() {
                         <div>
                           <p className="font-medium text-slate-800">Invoice {invoice.id}</p>
                           <p className="text-xs text-slate-500">
-                            Period {invoice.period} · {format(parseISO(invoice.periodStart), 'MMM d')} –{' '}
+                            Period {invoice.period} - {format(parseISO(invoice.periodStart), 'MMM d')} -{' '}
                             {format(parseISO(invoice.periodEnd), 'MMM d')}
                           </p>
                         </div>
@@ -520,5 +519,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-
