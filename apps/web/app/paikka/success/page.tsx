@@ -21,6 +21,11 @@ type OrderResponse = {
   jwt: string;
   created?: boolean;
 };
+type ExtendedOrder = Order & {
+  email?: string;
+  oid?: string;
+  jti?: string;
+};
 
 const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
 
@@ -144,6 +149,7 @@ export default async function SuccessPage({ searchParams }: { searchParams: Sear
   }
 
   const totals = state ? computeTotals(state) : { subtotal: 0, tip: 0, total: 0 };
+  const orderDetails = (orderResult?.order ?? null) as ExtendedOrder | null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -152,7 +158,7 @@ export default async function SuccessPage({ searchParams }: { searchParams: Sear
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold text-slate-900">You&apos;re all set.</h1>
             <p className="text-slate-600">
-              We emailed your QR code to <span className="font-medium">{orderResult.order.email}</span>. Show the QR or
+              We emailed your QR code to <span className="font-medium">{orderDetails?.email ?? state?.email ?? 'your inbox'}</span>. Show the QR or
               the backup code at pickup to skip the line.
             </p>
           </div>
@@ -160,11 +166,11 @@ export default async function SuccessPage({ searchParams }: { searchParams: Sear
           <div className="space-y-4 rounded-xl bg-slate-50 p-5">
             <div className="flex flex-col gap-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
               <span className="font-medium text-slate-900">Order ID</span>
-              <span>{orderResult.order.oid}</span>
+              <span>{orderDetails?.oid ?? orderDetails?.id ?? 'N/A'}</span>
             </div>
             <div className="flex flex-col gap-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
               <span className="font-medium text-slate-900">Backup code</span>
-              <span className="font-mono text-base text-slate-900">{orderResult.order.jti}</span>
+              <span className="font-mono text-base text-slate-900">{orderDetails?.jti ?? orderDetails?.id ?? 'N/A'}</span>
             </div>
             <div className="space-y-2 text-sm text-slate-600">
               <p className="font-medium text-slate-900">Items</p>
@@ -197,7 +203,7 @@ export default async function SuccessPage({ searchParams }: { searchParams: Sear
             </div>
           </div>
 
-          <ResendEmailButton order={orderResult.order} jwt={orderResult.jwt} />
+          <ResendEmailButton order={orderDetails ?? orderResult!.order} jwt={orderResult.jwt} />
 
           <div className="flex flex-col gap-2 text-sm text-slate-600">
             <span>
@@ -224,3 +230,4 @@ export default async function SuccessPage({ searchParams }: { searchParams: Sear
     </div>
   );
 }
+

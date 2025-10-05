@@ -90,7 +90,7 @@ export default function ProviderPage() {
   const upcomingBatches = useMemo(() => {
     return batches
       .slice()
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
   }, [batches]);
 
   const loadManifest = async (batchId: string) => {
@@ -406,3 +406,4 @@ export default function ProviderPage() {
     </div>
   );
 }
+

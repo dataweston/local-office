@@ -10,6 +10,8 @@ import {
   type ProgramUpsertRequest
 } from '../_lib/store';
 
+type ProgramSlot = NonNullable<Program['slots']>[number];
+
 function toProgramSlot(programId: string, slot: ProgramSlotInput) {
   return {
     id: slot.id ?? crypto.randomUUID(),
@@ -19,7 +21,7 @@ function toProgramSlot(programId: string, slot: ProgramSlotInput) {
     windowStart: slot.windowStart,
     windowEnd: slot.windowEnd,
     cutoffAt: slot.cutoffAt
-  } satisfies Program['slots'][number];
+  } as ProgramSlot;
 }
 
 export async function GET(request: NextRequest) {
@@ -90,3 +92,4 @@ export async function POST(request: NextRequest) {
 
   return json(program, 201);
 }
+

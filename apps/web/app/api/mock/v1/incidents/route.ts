@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const authError = ensureAuth(request);
   if (authError) return authError;
 
-  const payload = (await request.json()) as IncidentRequest;
+  const payload = (await request.json()) as (IncidentRequest & { orgId?: string });
   if (!payload.category || !payload.severity || !payload.description) {
     return badRequest('Incident requires a category, severity, and description.');
   }
@@ -58,3 +58,4 @@ export async function POST(request: NextRequest) {
 
   return json(incident, 201);
 }
+
